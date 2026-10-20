@@ -1,43 +1,21 @@
-name: ci-linux
+name: registry-checks
 on:
   push:
-    branches:
-      - main
   pull_request:
-
-concurrency:
-  group: ${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      # install deps.
-      - name: install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libsystemd-dev
-
-      - name: Install system dependencies
-        uses: input-output-hk/actions/base@latest
-
-      - uses: haskell-actions/setup@v2
-        id: cabal-setup
-        with:
-          ghc-version: '9.6.6'
-          cabal-version: '3.10.3.0'
-
       - uses: actions/checkout@v4
-
-      - name: Cache .cabal
-        uses: actions/cache@v3
+      - uses: haskell-actions/setup@v2
         with:
-          path: ${{ steps.cabal-setup.outputs.cabal-store }}
-          key: cabal-${{ hashFiles('cabal.project') }}
-
-      - name: build & test
-        run: |
-          cabal update
-          cabal build -j all --enable-tests
-          cabal test all
+          ghc-version: '9.6.7'
+          cabal-version: '3.16.1.0'
+      - run: cabal update
+      - run: cabal build all
+      - run: cabal test all
+      - run: python3 -m pip install -r requirements-test.txt
+      - run: python3 -m unittest discover -s tests -v
+      - run: |
+          cabal run registry-export -- governance "$RUNNER_TEMP/registry-governance.plutus"
+          python3 tools/registry_script_hash.py "$RUNNER_TEMP/registry-governance.plutus"

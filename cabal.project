@@ -1,8 +1,6 @@
--- Custom repository for cardano haskell packages, see
--- https://github.com/IntersectMBO/cardano-haskell-packages
--- for more information.
---
--- [NOTE] The "/" in the end of the URL is mandatory, or else we get a 404 NOT FOUND
+packages: .
+with-compiler: ghc-9.6.7
+
 repository cardano-haskell-packages
   url: https://chap.intersectmbo.org/
   secure: True
@@ -14,107 +12,13 @@ repository cardano-haskell-packages
     c00aae8461a256275598500ea0e187588c35a5d5d7454fb57eac18d9edb86a56
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
--- Van Rossem (PV11) stack on plutus 1.65 via cardano-api 11 / cardano-node 11.
---
--- Van Rossem support does NOT come from cardano-api: it has no builtin code at
--- all, and its Plutus-facing modules are byte-identical between 11.0.0.0 and
--- 11.3.0.0. The builtins are implemented in plutus-core 1.65 and gated on
--- `vanRossemPV = MajorProtocolVersion 11` in plutus-ledger-api 1.65, enforced at
--- script deserialisation. cardano-api 11.3's entire changelog is one entry --
--- widening its plutus bound from ^>=1.61 to ^>=1.65, "No ledger API changes".
---
--- So we take the equivalent plutus stack on 11.0 and lift the bound with the
--- allow-newer below. Staying on 11.0 avoids two unrelated sc-tools breakages:
--- convex-optics is built with -Werror and is written against the TxBodyContent
--- lenses that 11.2+ deprecates at the type level, and convex-base imports from
--- the Cardano.Api.Certificate wrapper module that 11.2 deleted. (PoolId itself
--- still exists in 11.3 -- an earlier note here claiming otherwise was wrong.)
 index-state:
   , hackage.haskell.org 2026-05-31T00:00:00Z
   , cardano-haskell-packages 2026-05-31T00:00:00Z
 
-with-compiler: ghc-9.6.6
-
-packages:
-    src/programmable-tokens-onchain
-    src/programmable-tokens-offchain
-    src/programmable-tokens-test
-    src/examples/regulated-stablecoin
-    src/examples/aiken/haskell
-
-constraints:
-  cardano-node == 11.0.0
-  -- Must be pinned, not merely intended: `allow-newer: *:cardano-api` below
-  -- lifts every upper bound on it, so without this the solver takes 11.3.0.0,
-  -- which deprecates the TxBodyContent lenses convex-optics builds with
-  -- -Werror and removes PoolId from convex-base.
-  , cardano-api == 11.0.0.0
-  , plutus-core == 1.65.0.0
-  , plutus-ledger-api == 1.65.0.0
-  , plutus-tx == 1.65.0.0
-  , plutarch == 1.14.0
-  , aeson == 2.2.4.1
-  , io-classes == 1.8.0.1
-  , blockfrost-client == 0.13.0.0
-  , blockfrost-client-core == 0.8.0.0
-  , validation < 1.2
-  , blockio +serialblockio
-
-allow-older:
-  *:cardano-api
-  , *:plutus-core
-  , *:plutus-ledger-api
-
-allow-newer:
-  *:cardano-api
-  , *:plutus-core
-  , *:plutus-ledger-api
-  , servant-multipart-client:random
-
--- Upstream Plutarch 1.14.0 (c3b47719) plus two fixes that belong upstream, on a
--- fork branch until they land there:
---   * Plutarch/Internal/Parse.hs carries a stray {-# LANGUAGE TypeAbstractions #-}
---     (GHC 9.8+) though upstream declares tested-with GHC ==9.6.4 and every @a in
---     that file is a type APPLICATION, not an abstraction.
---   * plutarch-orphanage defines `instance Arbitrary1 NonEmptyList`, which newer
---     QuickCheck now provides itself, making it a duplicate.
--- Each is a separate commit on that branch so it maps to its own upstream PR;
--- once both merge, repoint this at upstream and drop the fork.
---
--- 1.14 is what brings UPLC casing: pif is punsafeCase-based, ~6.9x cheaper CPU
--- and ~4.5x cheaper memory per conditional than the pif'/ifThenElse idiom.
+-- Keep the Plutarch/ledger API pair on the same source revision.
 source-repository-package
   type: git
   location: https://github.com/colll78/plutarch-plutus
   tag: eac4bf1c36bced4e7174e51680122c1f88f6405f
-  subdir:
-    .
-    plutarch-ledger-api
-
-source-repository-package
-  type: git
-  location: https://github.com/j-mueller/sc-tools
-  tag: 4546122230491db4839a4a42fc2bc601f7900909
-  subdir:
-    src/devnet
-    src/coin-selection
-    src/mockchain
-    src/optics
-    src/wallet
-    src/base
-    src/node-client
-    src/blockfrost
-    src/tx-mod
-
--- plutarch-onchain-lib's Plutarch 1.14 port (PR #27) plus the length-dispatched
--- value-scan key comparison (PR #28), at the commit the latter squash-merged to
--- main. Pin a MAIN commit here, never a PR branch head: the branch is deleted on
--- merge and its commits survive only on refs/pull/*, which a plain clone does not
--- fetch, so cabal's checkout fails on CI with "Could not parse object" while local
--- builds (whose checkouts have the commit) keep working.
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/catalyst-onchain-libs
-  tag: b756d9daee73d4a19465fcdf8ab794700406ce27
-  subdir:
-    src/plutarch-onchain-lib
+  subdir: . plutarch-ledger-api
