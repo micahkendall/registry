@@ -1,0 +1,32 @@
+cabal-version: 3.4
+name: cnt-registry
+version: 0.1.0.0
+license: Apache-2.0
+license-files: LICENSE
+synopsis: Plutarch primitives for a chunked Cardano native token registry
+
+library
+  exposed-modules: Registry.OnChain Registry.Governance Registry.Treasury Registry.Validator Registry.Policies
+  hs-source-dirs: src
+  default-language: GHC2021
+  default-extensions: DataKinds DeriveAnyClass DerivingVia OverloadedStrings TypeOperators
+  build-depends:
+      base >=4.18 && <5
+    , generics-sop
+    , bytestring
+    , plutarch
+    , plutarch-ledger-api
+
+test-suite onchain-compile
+  type: exitcode-stdio-1.0
+  main-is: OnChainCompile.hs
+  hs-source-dirs: tests
+  default-language: GHC2021
+  build-depends: base, bytestring, cnt-registry, mtl, plutarch, plutarch-ledger-api, plutus-ledger-api
+
+executable registry-export
+  main-is: Export.hs
+  hs-source-dirs: app
+  default-language: GHC2021
+  default-extensions: DataKinds OverloadedStrings RankNTypes TypeOperators
+  build-depends: base, bytestring, cnt-registry, plutarch, plutus-ledger-api

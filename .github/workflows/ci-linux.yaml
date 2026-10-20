@@ -1,43 +1,32 @@
-name: ci-linux
+name: registry-checks
 on:
   push:
-    branches:
-      - main
   pull_request:
-
-concurrency:
-  group: ${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      # install deps.
-      - name: install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libsystemd-dev
-
-      - name: Install system dependencies
-        uses: input-output-hk/actions/base@latest
-
-      - uses: haskell-actions/setup@v2
-        id: cabal-setup
-        with:
-          ghc-version: '9.6.6'
-          cabal-version: '3.10.3.0'
-
       - uses: actions/checkout@v4
-
-      - name: Cache .cabal
-        uses: actions/cache@v3
+      - uses: haskell-actions/setup@v2
         with:
-          path: ${{ steps.cabal-setup.outputs.cabal-store }}
-          key: cabal-${{ hashFiles('cabal.project') }}
-
-      - name: build & test
+          ghc-version: '9.6.7'
+          cabal-version: '3.16.1.0'
+      - name: Install Cardano crypto libraries
         run: |
-          cabal update
-          cabal build -j all --enable-tests
-          cabal test all
+          curl -fsSL --retry 3 https://github.com/input-output-hk/iohk-nix/releases/download/v3.1/debian.zip -o "$RUNNER_TEMP/cardano-crypto.zip"
+          echo "0dfec2dbc17e8fe45c99a46652e5a23b585e82baba15badfb02741b12e634c55  $RUNNER_TEMP/cardano-crypto.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/cardano-crypto.zip" -d "$RUNNER_TEMP/cardano-crypto"
+          sudo dpkg -i "$RUNNER_TEMP/cardano-crypto/debian.libsodium-vrf.deb" "$RUNNER_TEMP/cardano-crypto/debian.libsecp256k1.deb" "$RUNNER_TEMP/cardano-crypto/debian.libblst.deb"
+          sudo ln -s libsodium.pc /usr/local/opt/cardano/lib/pkgconfig/libsodium-any.pc
+          echo "PKG_CONFIG_PATH=/usr/local/opt/cardano/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/usr/local/opt/cardano/lib" >> "$GITHUB_ENV"
+          PKG_CONFIG_PATH=/usr/local/opt/cardano/lib/pkgconfig pkg-config --modversion libsodium-any libsecp256k1 libblst
+      - run: cabal update
+      - run: cabal build all
+      - run: cabal test all
+      - run: python3 tools/registry_budget_check.py tests/fixtures/preprod-v3-20261020.json
+      - run: python3 -m pip install -r requirements-test.txt
+      - run: python3 -m unittest discover -s tests -v
+      - run: |
+          cabal run registry-export -- governance "$RUNNER_TEMP/registry-governance.plutus"
+          python3 tools/registry_script_hash.py "$RUNNER_TEMP/registry-governance.plutus"

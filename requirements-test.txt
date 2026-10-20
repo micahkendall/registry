@@ -1,0 +1,2 @@
+-r requirements.txt
+cbor2>=6.1,<7
