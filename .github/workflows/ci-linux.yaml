@@ -14,6 +14,7 @@ jobs:
       - run: cabal update
       - run: cabal build all
       - run: cabal test all
+      - run: python3 tools/registry_budget_check.py tests/fixtures/preprod-v3-20261020.json
       - run: python3 -m pip install -r requirements-test.txt
       - run: python3 -m unittest discover -s tests -v
       - run: |
