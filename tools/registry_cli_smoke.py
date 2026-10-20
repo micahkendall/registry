@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from registry_content import plan
+from registry_content import MAX_CONTENT_BYTES, canonical_content, plan
 from registry_data import preimage_datum
 
 
@@ -87,11 +87,13 @@ def check(manifest_path: Path, executable: str, protocol_params: Path | None = N
             raise ValueError(f"signed upload is {size} bytes, above the 14 KB planning target")
         if large_upload:
             document = {"subject": "ab" * 28,
-                        "extension": {"value": "x" * 350_000, "sequenceNumber": 0}}
+                        "extension": {"value": "", "sequenceNumber": 0}}
+            overhead = len(canonical_content(document))
+            document["extension"]["value"] = "x" * (MAX_CONTENT_BYTES - overhead)
             upload = plan(document)
             parts = upload["preimages"]
-            if len(parts) < 30:
-                raise ValueError("350 KB entry unexpectedly needs fewer than 30 uploads")
+            if upload["contentBytes"] != MAX_CONTENT_BYTES or len(parts) != 32:
+                raise ValueError("maximum-size entry must need 32 uploads")
             largest_signed = 0
             largest_minimum_ada = 0
             for index, part in enumerate(parts):
@@ -144,7 +146,7 @@ def main() -> None:
     parser.add_argument("--cardano-cli", default="cardano-cli")
     parser.add_argument("--protocol-params", type=Path)
     parser.add_argument("--large-upload", action="store_true",
-                        help="sign one synthetic transaction per segment of a 350 KB CIP-26 entry")
+                        help="sign one synthetic transaction per segment of a 380,000-byte CIP-26 entry")
     args = parser.parse_args()
     print(json.dumps(check(args.manifest, args.cardano_cli, args.protocol_params,
                            large_upload=args.large_upload), indent=2))
